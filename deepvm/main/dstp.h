@@ -1,7 +1,11 @@
-/*
-* deepvm serial transfer protocol
-* PC ------serial--------> IoT device
-* PC <------serial-------- IoT device
+/* 
+Author: chinesebear
+Email: swubear@163.com
+Website: http://chinesebear.github.io
+Date: 2020/11/3
+Description: DSTP, deepvm serial transfer protocol
+            PC ------serial--------> IoT device
+            PC <------serial-------- IoT device
 */
 
 #ifndef _DSTP_H
