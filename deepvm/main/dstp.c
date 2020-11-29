@@ -9,14 +9,20 @@ Description: DSTP, deepvm serial transfer protocol
 */
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "deep_common.h"
 #include "dstp.h"
 #define RING_BUF_SIZE 512
 #define DSTP_DUMMY 0xFF
+#define CMD_STR_LEN (120)
 
 static unsigned char RingDataBuffer[RING_BUF_SIZE] = {0};
 static int DataInIndex = 0;
 static int DataOutIndex = 0;
-static int ProcessState = DSTP_FRAME_HEAD;
+static int ProcessState = DSTP_ASCII_STRING;
+static int ProcessMode = DSTP_ASII_MODE;
 static dstp_frame_t dstp = {0};
 
 static unsigned char get_dstp_sum (dstp_frame_t *frame) {
@@ -66,12 +72,23 @@ static unsigned char ring_buf_dataout (void) {
         return DSTP_DUMMY;
     }
     data = RingDataBuffer[DataOutIndex];
-    if (DataInIndex >= (RING_BUF_SIZE - 1)) {
-        DataInIndex = 0;
+    if (DataOutIndex >= (RING_BUF_SIZE - 1)) {
+        DataOutIndex = 0;
     } else {
-        DataInIndex++;
+        DataOutIndex++;
     }
     return data;
+}
+
+static int get_process_mode (void) {
+    return ProcessMode;
+}
+
+static void set_process_mode (int mode) {
+    if (mode != DSTP_ASII_MODE && mode != DSTP_FRAME_MODE) {
+        return;
+    }
+    ProcessMode = mode;
 }
 
 static int get_process_state (void) {
@@ -79,7 +96,7 @@ static int get_process_state (void) {
 }
 
 static void set_process_state (int state) {
-    if (state > DSTP_FRAME_SUM || state < DSTP_FRAME_HEAD) {
+    if (state > DSTP_STATE_END || state < DSTP_STATE_START) {
         return;
     }
     ProcessState = state;
@@ -90,7 +107,7 @@ static void reset_process_state (void) {
     if (dstp.payload != NULL) {
         deep_free(dstp.payload);
     }
-    memset (dstp, 0x00, sizeof(dstp));
+    memset ((unsigned char *) &dstp, 0x00, sizeof(dstp));
 }
 
 static int process_read_data (unsigned char *data, int len, int timeout_ms) {
@@ -191,7 +208,7 @@ static void process_tail_handle (void) {
 }
 
 static void process_send_ack (void) {
-    return frame_send (DSTP_CMD_ACK, "ACK", 4);
+    return frame_send (DSTP_CMD_ACK, (unsigned char *) "ACK", 4);
 }
 
 static void process_sum_handle (void) {
@@ -226,14 +243,41 @@ static void process_sum_handle (void) {
     }
     /* DSTP cmd handle done */
 }
+static void process_ascstr_handle (void) {
+    char buf[CMD_STR_LEN] = {0};
+    int i = 0;
+    deep_printf ("deeplang prompt> ");
+    while (1) {
+        if (ring_buf_empty()) {
+            vTaskDelay (1);
+        }
+        char ch = ring_buf_dataout ();
+        buf[i++] = ch;
+        if (ch == DSTP_ASCII_TAIL) {
+            break;
+        }
+    }
+    deep_printf ("%s",buf);
+    //dump ("cmd", (unsigned char *)buf, CMD_STR_LEN);
+    /* check buildin function and run repl */
+    if (memcmp (":help", buf, strlen (":help")) == 0) {
+        deep_printf ("help info\r\n");
+    } else if (memcmp (":exit", buf, strlen (":exit")) == 0) {
+        deep_printf ("exit repl\r\n");
+    } else if (memcmp (":version", buf, strlen (":version")) == 0) {
+        deep_printf ("deeplang v1.0\r\n");
+    } else if (memcmp (":memstat", buf, strlen (":memstat")) == 0) {
+        deep_printf ("Total 100KB, left 10KB\r\n");
+    } 
+}
 
-void deep_dstp_get_data (unsigned char data) {
+void deep_dstp_datain (unsigned char data) {
     return ring_buf_datain (data);
 }
 
 void deep_dstp_process (void) {
     if (ring_buf_empty ()) {
-        // todo :os_delay (100)
+        vTaskDelay (100);
         return;
     }
     int state = get_process_state();
@@ -256,10 +300,12 @@ void deep_dstp_process (void) {
         case DSTP_FRAME_SUM:
             process_sum_handle ();
             break;
+        case DSTP_ASCII_STRING:
+            process_ascstr_handle ();
+            break;
         default:
-            printf ("Wrong DSTP frame state:0x%02X\r\n", state);
+            printf ("Wrong DSTP state:0x%02X\r\n", state);
             break;
     }
 }
-
 

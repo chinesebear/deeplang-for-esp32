@@ -15,7 +15,7 @@ Description: deepvm is a language VM for deeplang(www.deeplang.org).
 #include "esp_system.h"
 #include "esp_spi_flash.h"
 #include "deep_common.h"
-#include "log.h"
+#include "dstp.h"
 
 
 #ifdef CONFIG_IDF_TARGET_ESP32
@@ -54,7 +54,7 @@ static void uart0Init (void) {
     uart_driver_install(UART_NUM_0, BUF_SIZE * 2, 0, 0, NULL, 0);
 }
 
-static void Uart0Recv()
+static void Uart0Recv(void *arg)
 {
     // Configure a temporary buffer for the incoming data
     uint8_t *data = (uint8_t *) malloc(BUF_SIZE);
@@ -68,6 +68,28 @@ static void Uart0Recv()
     }
 }
 
+static void deepvm_uart_process_task(void *arg)
+{
+    // Configure a temporary buffer for the incoming data
+    uint8_t *data = (uint8_t *) malloc(BUF_SIZE);
+    while (1) {
+        // Read data from the UART
+        int len = uart_read_bytes(UART_NUM_0, data, BUF_SIZE, 20 / portTICK_RATE_MS);
+        if(len > 0) {
+            for (int i = 0; i < len; i++) {
+                deep_dstp_datain (data[i]);
+            }
+        } else {
+            vTaskDelay (20);
+        }
+    }
+}
+
+static void deepvm_dstp_task (void *arg) {
+    while (1) {
+        deep_dstp_process ();
+    }
+}
 
 static int count = 0;
 static void parser_task(void *arg)
@@ -126,5 +148,7 @@ void app_main(void)
     //xTaskCreate(event_manager_task, "event_manager_task", 2048, NULL, 12, NULL);
     //xTaskCreate(uart_file_manager_task, "uart_file_manager_task", 2048, NULL, 12, NULL);
     //xTaskCreate(uart0_rx_task, "uart0_rx_task", 2048, NULL, 10, NULL);
-    xTaskCreate(Uart0Recv, "uart_echo_task", 2048, NULL, 10, NULL);
+    //xTaskCreate(Uart0Recv, "uart_echo_task", 2048, NULL, 10, NULL);
+    xTaskCreate(deepvm_uart_process_task, "deepvm_uart_process_task", 2048, NULL, 12, NULL);
+    xTaskCreate(deepvm_dstp_task, "deepvm_dstp_task", 2048, NULL, 10, NULL);
 }
