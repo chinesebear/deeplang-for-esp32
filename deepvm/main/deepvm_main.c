@@ -80,7 +80,7 @@ static void deepvm_uart_process_task(void *arg)
                 deep_dstp_datain (data[i]);
             }
         } else {
-            vTaskDelay (20);
+            vTaskDelay (50);
         }
     }
 }
@@ -141,7 +141,7 @@ void app_main(void)
     deep_printf ("There are %d ms per tick\r\n",portTICK_PERIOD_MS);
 
     /* Deepvm start */
-    deep_printf ("Deepvm for deeplang 1.0\r\n");
+    deep_printf ("Deepvm for deeplang 0.1\r\n");
     deep_printf ("Deepvm includes parser, wasm vm, event manager, uart file manager\r\n");
     //xTaskCreate(parser_task, "parser_task", 2048, NULL, 10, NULL);
     //xTaskCreate(wasm_vm_task, "wasm_vm_task", 2048, NULL, 10, NULL);
@@ -149,6 +149,6 @@ void app_main(void)
     //xTaskCreate(uart_file_manager_task, "uart_file_manager_task", 2048, NULL, 12, NULL);
     //xTaskCreate(uart0_rx_task, "uart0_rx_task", 2048, NULL, 10, NULL);
     //xTaskCreate(Uart0Recv, "uart_echo_task", 2048, NULL, 10, NULL);
-    xTaskCreate(deepvm_uart_process_task, "deepvm_uart_process_task", 2048, NULL, 12, NULL);
-    xTaskCreate(deepvm_dstp_task, "deepvm_dstp_task", 2048, NULL, 10, NULL);
+    xTaskCreate(deepvm_uart_process_task, "deepvm_uart_process_task", 2048, NULL, 10, NULL);
+    xTaskCreate(deepvm_dstp_task, "deepvm_dstp_task", 2048, NULL, 12, NULL);
 }

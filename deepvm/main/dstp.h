@@ -11,7 +11,7 @@ Description: DSTP, deepvm serial transfer protocol
 #ifndef _DSTP_H
 #define _DSTP_H
 
-#define DSTP_ASII_MODE  0xA1   /* for repl */
+#define DSTP_ASCII_MODE  0xA1   /* for repl */
 #define DSTP_FRAME_MODE 0xA2   /* for dp file downloading */
 
 #define DSTP_ASCII_TAIL '\n'

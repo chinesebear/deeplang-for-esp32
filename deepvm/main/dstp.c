@@ -19,10 +19,10 @@ Description: DSTP, deepvm serial transfer protocol
 #define CMD_STR_LEN (120)
 
 static unsigned char RingDataBuffer[RING_BUF_SIZE] = {0};
-static int DataInIndex = 0;
-static int DataOutIndex = 0;
-static int ProcessState = DSTP_ASCII_STRING;
-static int ProcessMode = DSTP_ASII_MODE;
+static volatile int DataInIndex = 0;
+static volatile int DataOutIndex = 0;
+static volatile int ProcessState = DSTP_ASCII_STRING;
+static volatile int ProcessMode = DSTP_ASII_MODE;
 static dstp_frame_t dstp = {0};
 
 static unsigned char get_dstp_sum (dstp_frame_t *frame) {
@@ -252,23 +252,31 @@ static void process_ascstr_handle (void) {
             vTaskDelay (1);
         }
         char ch = ring_buf_dataout ();
-        buf[i++] = ch;
-        if (ch == DSTP_ASCII_TAIL) {
+        if (ch == '\r' || ch == '\n') {
             break;
         }
+        deep_printf ("%c", ch);
+        buf[i++] = ch;
     }
-    deep_printf ("%s",buf);
-    //dump ("cmd", (unsigned char *)buf, CMD_STR_LEN);
+    deep_printf ("\r\n");
     /* check buildin function and run repl */
     if (memcmp (":help", buf, strlen (":help")) == 0) {
-        deep_printf ("help info\r\n");
+        deep_printf (":help      help info\r\n");
+        deep_printf (":exit      exit repl\r\n");
+        deep_printf (":version   deeplang version\r\n");
+        deep_printf (":memstat   memory status info\r\n");
+        deep_printf (":mode      dstp mode\r\n");
     } else if (memcmp (":exit", buf, strlen (":exit")) == 0) {
         deep_printf ("exit repl\r\n");
     } else if (memcmp (":version", buf, strlen (":version")) == 0) {
-        deep_printf ("deeplang v1.0\r\n");
+        deep_printf ("deeplang v0.1\r\n");
     } else if (memcmp (":memstat", buf, strlen (":memstat")) == 0) {
-        deep_printf ("Total 100KB, left 10KB\r\n");
-    } 
+        deep_printf ("Total 100KB, Left 10KB\r\n");
+    } else if (memcmp (":mode", buf, strlen (":mode")) == 0) {
+        deep_printf ("ascii mode\r\n");
+    } else {
+        deep_printf ("deep_eval (\"%s\")\r\n", buf);
+    }
 }
 
 void deep_dstp_datain (unsigned char data) {
@@ -277,7 +285,7 @@ void deep_dstp_datain (unsigned char data) {
 
 void deep_dstp_process (void) {
     if (ring_buf_empty ()) {
-        vTaskDelay (100);
+        vTaskDelay (5);
         return;
     }
     int state = get_process_state();
